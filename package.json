@@ -1,0 +1,23 @@
+{
+  "name": "mmddyy",
+  "version": "2026.9.18",
+  "description": "Calendars, events and sharing from your terminal or AI client",
+  "type": "module",
+  "bin": { "mmddyy": "dist/main.js" },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "bun build src/main.ts --target=node --format=esm --packages=external --outfile=dist/main.js",
+    "check": "tsc --noEmit",
+    "test": "bun test tests",
+    "prepack": "bun run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "commander": "^14.0.0",
+    "proper-lockfile": "^4.1.2",
+    "zod": "4.5.4"
+  },
+  "devDependencies": { "@types/proper-lockfile": "^4.1.4", "@types/node": "^26.6.1", "@types/bun": "^1.4.2", "typescript": "5.9.3" }
+}

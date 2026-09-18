@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tgz
+.local/
+.env
+.env.*
+.dev.vars*
+secrets.json
+*.pem
+.DS_Store
