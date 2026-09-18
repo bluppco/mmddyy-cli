@@ -1,8 +1,11 @@
 {
-  "name": "mmddyy",
-  "version": "2026.9.18",
+  "name": "@mmddyy/cli",
+  "version": "0.1.0",
   "description": "Calendars, events and sharing from your terminal or AI client",
   "type": "module",
+  "homepage": "https://mmddyy.app",
+  "repository": { "type": "git", "url": "git+https://github.com/bluppco/mmddyy-cli.git" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "bin": { "mmddyy": "dist/main.js" },
   "files": ["dist", "README.md"],
   "engines": { "node": ">=22.12.0" },

@@ -1,8 +1,9 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { AuthStore, authenticatedFetch, CliError } from './auth';
+import { version } from './version';
 
 export async function connect(store: AuthStore) {
-  const client = new Client({ name: 'mmddyy-cli', version: '2026.9.18' }, { versionNegotiation: { mode: 'auto' } });
+  const client = new Client({ name: 'mmddyy-cli', version }, { versionNegotiation: { mode: 'auto' } });
   const transport = new StreamableHTTPClientTransport(new URL('/mcp', store.origin), { fetch: authenticatedFetch(store) });
   try { await client.connect(transport); } catch (error) { await transport.close(); throw error; }
   return client;

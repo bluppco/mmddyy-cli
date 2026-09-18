@@ -4,7 +4,7 @@ Calendars, events, teams, and sharing from your terminal or an MCP client.
 Requires Node.js 22.12 or newer.
 
 ```sh
-npm install -g mmddyy
+npm install -g @mmddyy/cli
 mmddyy auth login
 mmddyy calendars list
 mmddyy events list --calendar CALENDAR_ID \
@@ -78,7 +78,7 @@ For local stdio clients, sign in once with the CLI, then configure:
 }
 ```
 
-Alternatively use `"command": "npx", "args": ["-y", "mmddyy", "mcp"]`.
+Alternatively use `"command": "npx", "args": ["-y", "@mmddyy/cli", "mcp"]`.
 The stdio server forwards the hosted tool definitions and calls. It never opens a
 browser automatically; run `mmddyy auth login` first. Diagnostics use stderr only.
 Disconnect apps at `https://mmddyy.app/connected-apps`. If renewal was interrupted,

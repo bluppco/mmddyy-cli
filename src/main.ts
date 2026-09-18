@@ -2,7 +2,8 @@
 import { Command, CommanderError } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { commandTools, operations, version, type OperationName } from '../../mcp/src/contracts';
+import { commandTools, operations, type OperationName } from '../../mcp/src/contracts';
+import { version } from './version';
 import { AuthStore, CliError, login, serverOrigin } from './auth';
 import { call } from './client';
 import { serveStdio } from './mcp';
