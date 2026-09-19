@@ -16,6 +16,12 @@ sharing access. Each connection has its own session; existing calendar roles sti
 apply. `--no-browser` prints the URL instead. The browser callback must reach the
 CLI's loopback listener on the same machine.
 
+New here? Choose **Create an account** on the connection page. After website
+signup, you return to permission approval without entering your password again.
+The connection expires after ten minutes; if it expires after signup, run
+`mmddyy auth login` again and sign in with the account you just created.
+Ordinary commands do not launch a browser or retry calendar operations after login.
+
 ```sh
 mmddyy events create --calendar CALENDAR_ID --title 'Design review' \
   --start 2026-09-18T10:00 --end 2026-09-18T11:00 \
@@ -51,6 +57,10 @@ Dates and updates:
 as `{ "error": { "code", "message", "status" } }`. Exit codes: 0 success,
 1 operation/network failure, 2 invalid input, 3 sign-in required.
 
+Authentication errors also include `error.recovery` with `signup_url` and
+`login_command`. These use your selected server. Permission denials and service
+outages remain ordinary errors, without signup guidance.
+
 `--input event.json` or `--input -` reads a JSON object using snake_case tool field
 names. Explicit flags override file fields.
 
@@ -79,8 +89,11 @@ For local stdio clients, sign in once with the CLI, then configure:
 ```
 
 Alternatively use `"command": "npx", "args": ["-y", "@mmddyy/cli", "mcp"]`.
-The stdio server forwards the hosted tool definitions and calls. It never opens a
-browser automatically; run `mmddyy auth login` first. Diagnostics use stderr only.
+The stdio server exposes the bundled tool definitions and forwards calls to the
+hosted service. It starts even without credentials and returns signup/login
+instructions as tool errors. Run `mmddyy auth login` in a terminal, then retry the
+tool; the running server picks up the new credentials without a restart. It never
+opens a browser automatically. Diagnostics use stderr only.
 Disconnect apps at `https://mmddyy.app/connected-apps`. If renewal was interrupted,
 run `auth login` again rather than retrying an expired connection indefinitely.
 

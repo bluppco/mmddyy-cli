@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { commandTools, operations, type OperationName } from '../../mcp/src/contracts';
 import { version } from './version';
-import { AuthStore, CliError, login, serverOrigin } from './auth';
+import { AuthStore, CliError, cliFailure, login, serverOrigin } from './auth';
 import { call } from './client';
 import { serveStdio } from './mcp';
 
@@ -22,7 +22,7 @@ const auth = program.command('auth').description('Manage your browser-authorized
 auth.command('login').option('--no-browser', 'Print the sign-in URL without opening it').action(async options => { await login(store(), options.browser === false); output({ data: { connected: true } }); });
 auth.command('logout').action(async () => { await store().logout(); output({ data: { connected: false } }); });
 auth.command('status').action(async () => output(await call(store(), 'get_account', {})));
-program.command('mcp').description('Serve the hosted tools over stdio. Run auth login first.').action(async () => { await serveStdio(store()); });
+program.command('mcp').description('Serve calendar tools over stdio; use auth login when prompted.').action(async () => { await serveStdio(store()); });
 const groups = new Map<string, Command>();
 const flagFor = (field: string) => ({ calendar_id: 'calendar', workspace_id: 'workspace', event_id: 'event', member_id: 'member', invite_id: 'invite' } as Record<string, string>)[field] ?? field.replaceAll('_', '-');
 const camel = (flag: string) => flag.replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
@@ -73,7 +73,8 @@ catch (error) {
   if (error instanceof CommanderError && error.exitCode === 0) process.exitCode = 0;
   else {
     const failure = error instanceof CliError ? error : error instanceof z.ZodError ? new CliError(error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), 'invalid_input', 400) : error instanceof CommanderError ? new CliError(error.message, 'invalid_input', 400) : new CliError(error instanceof Error ? error.message : 'Request failed.');
-    process.stderr.write(program.opts().json ? `${JSON.stringify({ error: { code: failure.code, message: failure.message, status: failure.status } })}\n` : `${failure.message}\n`);
+    const result = cliFailure(failure, program.opts().server);
+    process.stderr.write(program.opts().json ? `${JSON.stringify({ error: { code: result.code, message: result.message, status: result.status, ...(result.recovery ? { recovery: result.recovery } : {}) } })}\n` : `${result.message}\n`);
     process.exitCode = failure.status === 401 || failure.code === 'invalid_grant' ? 3 : failure.status === 400 ? 2 : 1;
   }
 }

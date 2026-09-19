@@ -6,9 +6,30 @@ import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
 import lockfile from 'proper-lockfile';
 import { z } from 'zod';
+import { authRecovery, recoveryMessage, type AuthRecovery } from '../../mcp/src/recovery';
+import { SdkError, SdkHttpError } from '@modelcontextprotocol/client';
 
 export class CliError extends Error {
-  constructor(message: string, readonly code = 'request_failed', readonly status = 500) { super(message); }
+  constructor(message: string, readonly code = 'request_failed', readonly status = 500, readonly recovery?: AuthRecovery) { super(message); }
+}
+export function authFailure(origin: string, message = 'Authentication required.', code = 'unauthorized', status = 401) {
+  return new CliError(`${message} ${recoveryMessage(origin)}`, code, status, authRecovery(origin));
+}
+export function cliFailure(error: unknown, origin: string): CliError {
+  // The SDK wraps fetch failures during protocol-version negotiation. Preserve
+  // the original typed failure instead of turning auth errors into status 500.
+  const visited = new Set<Error>();
+  let cause = error;
+  while (cause instanceof Error && !visited.has(cause)) {
+    visited.add(cause);
+    if (cause instanceof CliError) return (cause.status === 401 || cause.code === 'invalid_grant') && !cause.recovery
+      ? authFailure(origin, cause.message, cause.code, cause.status) : cause;
+    if (cause instanceof SdkHttpError) return cause.status === 401 ? authFailure(origin)
+      : new CliError(cause.message, cause.status === 403 ? 'forbidden' : 'request_failed', cause.status);
+    const data = cause instanceof SdkError ? cause.data : undefined;
+    cause = cause.cause ?? (data && typeof data === 'object' && 'cause' in data ? data.cause : undefined);
+  }
+  return new CliError(error instanceof Error ? error.message : 'Request failed.');
 }
 const credentialsSchema = z.object({ origin: z.string(), client_id: z.string(), access_token: z.string(), refresh_token: z.string(), expires_at: z.number(), scope: z.string() });
 type Credentials = z.infer<typeof credentialsSchema>;
@@ -35,7 +56,7 @@ export class AuthStore {
     try {
       const raw = JSON.parse(await readFile(this.path, 'utf8'));
       const current = raw === null ? null : credentialsSchema.parse(raw);
-      if (current && current.origin !== this.origin) throw new CliError('Credentials belong to a different server.', 'unauthorized', 401);
+      if (current && current.origin !== this.origin) throw authFailure(this.origin, 'Credentials belong to a different server.');
       return await fn(current, async state => {
         const temp = `${this.path}.${randomBytes(12).toString('hex')}.tmp`;
         await writeFile(temp, JSON.stringify(state), { mode: 0o600 });
@@ -46,7 +67,7 @@ export class AuthStore {
   }
   async access(failedToken?: string) {
     return this.locked(async (state, save) => {
-      if (!state) throw new CliError('Run mmddyy auth login first.', 'unauthorized', 401);
+      if (!state) throw authFailure(this.origin);
       if (state.expires_at > Date.now() + 60000 && (!failedToken || failedToken !== state.access_token)) return state.access_token;
       const response = await oauth(this.origin, '/oauth/token', new URLSearchParams({ grant_type: 'refresh_token', refresh_token: state.refresh_token, client_id: state.client_id, resource: `${this.origin}/mcp` }));
       const tokens = tokensSchema.parse(response);
@@ -67,7 +88,11 @@ async function oauth(origin: string, path: string, body: URLSearchParams | Recor
   const form = body instanceof URLSearchParams;
   const response = await fetch(`${origin}${path}`, { method: 'POST', redirect: 'error', headers: { 'Content-Type': form ? 'application/x-www-form-urlencoded' : 'application/json' }, body: form ? body.toString() : JSON.stringify(body), signal: AbortSignal.timeout(30000) });
   const result = await response.json().catch(() => ({})) as Record<string, unknown>;
-  if (!response.ok) throw new CliError(result.error === 'invalid_grant' ? 'This connection expired or was interrupted. Run mmddyy auth login again.' : typeof result.error_description === 'string' ? result.error_description : 'Authorization request failed.', String(result.error ?? 'authorization_failed'), response.status);
+  if (!response.ok) {
+    const code = String(result.error ?? 'authorization_failed');
+    if (response.status === 401 || code === 'invalid_grant') throw authFailure(origin, 'This connection expired or was interrupted.', code, response.status);
+    throw new CliError(typeof result.error_description === 'string' ? result.error_description : 'Authorization request failed.', code, response.status);
+  }
   return result;
 }
 
@@ -93,7 +118,7 @@ export async function login(store: AuthStore, noBrowser = false) {
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Unable to listen for authorization callback.');
   const redirectUri = `http://127.0.0.1:${address.port}/callback`;
-  const timeout = setTimeout(() => fail(new CliError('Login timed out. Run mmddyy auth login again.', 'login_timeout', 401)), 600000);
+  const timeout = setTimeout(() => fail(authFailure(store.origin, 'Login timed out. If you created an account, sign in with it to reconnect.', 'login_timeout')), 600000);
   try {
     const client = await oauth(store.origin, '/oauth/register', { client_name: 'mmddyy CLI', redirect_uris: [redirectUri], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] });
     const clientId = z.string().parse(client.client_id);
@@ -128,6 +153,11 @@ export function authenticatedFetch(store: AuthStore) {
     const response = await send(token);
     if (response.status !== 401) return response;
     await response.body?.cancel();
-    return send(await store.access(token));
+    const retried = await send(await store.access(token));
+    if (retried.status === 401) {
+      await retried.body?.cancel();
+      throw authFailure(store.origin, 'The server rejected this connection.');
+    }
+    return retried;
   };
 }
