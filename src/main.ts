@@ -68,6 +68,10 @@ for (const [path, name] of Object.entries(commandTools) as [string, OperationNam
     output(await call(store(), name, input));
   });
 }
+// Bare commands are requests for help, including command groups such as `auth`.
+for (const command of [program, auth, ...groups.values()]) {
+  command.addHelpCommand().action(() => { command.help(); });
+}
 try { await program.parseAsync(); }
 catch (error) {
   if (error instanceof CommanderError && error.exitCode === 0) process.exitCode = 0;
