@@ -123,7 +123,7 @@ export async function login(store: AuthStore, noBrowser = false) {
     const client = await oauth(store.origin, '/oauth/register', { client_name: 'mmddyy CLI', redirect_uris: [redirectUri], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'] });
     const clientId = z.string().parse(client.client_id);
     const authorize = new URL('/oauth/authorize', store.origin);
-    authorize.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: 'read write sharing', state, code_challenge: challenge, code_challenge_method: 'S256', resource: `${store.origin}/mcp` }).toString();
+    authorize.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: 'read write sharing profile', state, code_challenge: challenge, code_challenge_method: 'S256', resource: `${store.origin}/mcp` }).toString();
     process.stderr.write(`Open this URL to sign in:\n${authorize}\n`);
     if (!noBrowser) {
       const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'rundll32' : 'xdg-open';

@@ -5,9 +5,9 @@ Requires Node.js 22.12 or newer.
 
 ```sh
 npm install -g @mmddyy/cli
-mmddyy auth login
-mmddyy calendars list
-mmddyy events list --calendar CALENDAR_ID \
+md auth login
+md calendars list
+md events list --calendar CALENDAR_ID \
   --from 2026-09-18T00:00:00Z --to 2026-09-25T00:00:00Z
 ```
 
@@ -19,23 +19,37 @@ CLI's loopback listener on the same machine.
 New here? Choose **Create an account** on the connection page. After website
 signup, you return to permission approval without entering your password again.
 The connection expires after ten minutes; if it expires after signup, run
-`mmddyy auth login` again and sign in with the account you just created.
+`md auth login` again and sign in with the account you just created.
 Ordinary commands do not launch a browser or retry calendar operations after login.
 
 ```sh
-mmddyy events create --calendar CALENDAR_ID --title 'Design review' \
+md events create --calendar CALENDAR_ID --title 'Design review' \
   --start 2026-09-18T10:00 --end 2026-09-18T11:00 \
   --time-zone Asia/Kolkata --recurrence weekly
-mmddyy events update --calendar CALENDAR_ID --event EVENT_ID --title 'Weekly review'
-mmddyy invites create --calendar CALENDAR_ID --role viewer
-mmddyy auth status
-mmddyy auth logout
+md events update --calendar CALENDAR_ID --event EVENT_ID --title 'Weekly review'
+md invites create --calendar CALENDAR_ID --role viewer
+md auth status
+md auth logout
 ```
 
 Use `--help` on any command to see its options. Command groups are `workspaces`,
 `calendars`, `events`, `members`, and `invites`. `whoami` displays your account.
 Workspaces support list/create; calendars support list/create/update. The remaining
 commands mirror the application's event and sharing workflows.
+
+`calendars list` prints every accessible calendar in server order, without a
+selection prompt. Each entry includes its name, full copyable ID, group, role,
+visibility, and time zone; default calendars are marked `(default)`:
+
+```text
+My calendar (default)
+  ID: 6c21043b-e986-472b-ac91-6a8ec8d504af
+  Group: Personal · Role: Owner · Visibility: Private
+  Time zone: Asia/Calcutta
+```
+
+Entries are separated by a blank line. An empty list prints `No calendars found.`
+Use `md --json calendars list` for the complete data, including internal fields.
 
 Dates and updates:
 
@@ -65,8 +79,8 @@ outages remain ordinary errors, without signup guidance.
 names. Explicit flags override file fields.
 
 ```sh
-mmddyy --json events create --input event.json
-mmddyy --server http://127.0.0.1:8788 auth login
+md --json events create --input event.json
+md --server http://127.0.0.1:8788 auth login
 ```
 
 `MMDDYY_SERVER` sets the default origin. `MMDDYY_CONFIG_DIR` overrides credential
@@ -83,7 +97,7 @@ For local stdio clients, sign in once with the CLI, then configure:
 ```json
 {
   "mcpServers": {
-    "mmddyy": { "command": "mmddyy", "args": ["mcp"] }
+    "mmddyy": { "command": "md", "args": ["mcp"] }
   }
 }
 ```
@@ -91,7 +105,7 @@ For local stdio clients, sign in once with the CLI, then configure:
 Alternatively use `"command": "npx", "args": ["-y", "@mmddyy/cli", "mcp"]`.
 The stdio server exposes the bundled tool definitions and forwards calls to the
 hosted service. It starts even without credentials and returns signup/login
-instructions as tool errors. Run `mmddyy auth login` in a terminal, then retry the
+instructions as tool errors. Run `md auth login` in a terminal, then retry the
 tool; the running server picks up the new credentials without a restart. It never
 opens a browser automatically. Diagnostics use stderr only.
 Disconnect apps at `https://mmddyy.app/connected-apps`. If renewal was interrupted,

@@ -13,7 +13,7 @@ test('missing credentials include signup and a login command for the selected se
   const directory = await mkdtemp(join(tmpdir(), 'mmddyy-recovery-'));
   try {
     await expect(new AuthStore('http://127.0.0.1:8788', directory).access()).rejects.toMatchObject({ status: 401, recovery: {
-      signup_url: 'http://127.0.0.1:8788/signup', login_command: "mmddyy --server 'http://127.0.0.1:8788' auth login",
+      signup_url: 'http://127.0.0.1:8788/signup', login_command: "md --server 'http://127.0.0.1:8788' auth login",
     } });
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
@@ -34,7 +34,7 @@ test('401 refresh retries once, while forbidden and network failures do not beco
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(Response.json({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 900 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
-    await expect(authenticatedFetch(store)(`${store.origin}/mcp`)).rejects.toMatchObject({ status: 401, recovery: { login_command: 'mmddyy auth login' } });
+    await expect(authenticatedFetch(store)(`${store.origin}/mcp`)).rejects.toMatchObject({ status: 401, recovery: { login_command: 'md auth login' } });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     fetchMock.mockClear(); await seed();
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 403 }));
@@ -44,7 +44,7 @@ test('401 refresh retries once, while forbidden and network failures do not beco
     await expect(authenticatedFetch(store)(`${store.origin}/mcp`)).rejects.toThrow('offline');
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(Response.json({ error: 'invalid_grant' }, { status: 400 }));
-    await expect(authenticatedFetch(store)(`${store.origin}/mcp`)).rejects.toMatchObject({ code: 'invalid_grant', recovery: { login_command: 'mmddyy auth login' } });
+    await expect(authenticatedFetch(store)(`${store.origin}/mcp`)).rejects.toMatchObject({ code: 'invalid_grant', recovery: { login_command: 'md auth login' } });
   } finally { fetchMock.mockRestore(); await rm(directory, { recursive: true, force: true }); }
 });
 test('credentials are isolated by origin, private, and serialized across callers', async () => {

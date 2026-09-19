@@ -31,7 +31,7 @@ test('local MCP lists tools without auth and recovers in the same process after 
     expect(failed.isError).toBe(true);
     expect(failed.content).toEqual([expect.objectContaining({ text: expect.stringContaining('Create an account') })]);
     const text = failed.content?.find(item => item.type === 'text');
-    expect(JSON.parse(text?.type === 'text' ? text.text : '{}')).toMatchObject({ error: { status: 401, code: 'unauthorized', recovery: { login_command: 'mmddyy auth login' } } });
+    expect(JSON.parse(text?.type === 'text' ? text.text : '{}')).toMatchObject({ error: { status: 401, code: 'unauthorized', recovery: { login_command: 'md auth login' } } });
     expect(fetchMock).not.toHaveBeenCalled();
     await store.locked(async (_state, save) => save({ origin: store.origin, client_id: 'client', access_token: 'access', refresh_token: 'refresh', expires_at: Date.now() + 600000, scope: 'read' }));
     const success = await client.callTool({ name: 'get_account', arguments: {} });

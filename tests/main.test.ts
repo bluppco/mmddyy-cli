@@ -8,7 +8,7 @@ test('bare commands and explicit help print usage successfully', async () => {
     const child = Bun.spawn([process.execPath, 'src/main.ts', ...args], { stdout: 'pipe', stderr: 'pipe' });
     const [status, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
     expect(status, `${args.join(' ')}: ${stderr}`).toBe(0);
-    expect(stdout).toContain('Usage: mmddyy');
+    expect(stdout).toContain('Usage: md');
     expect(stdout).toContain('Commands:');
     expect(stderr).toBe('');
     expect(stdout).not.toContain('(outputHelp)');

@@ -7,13 +7,15 @@ import { version } from './version';
 import { AuthStore, CliError, cliFailure, login, serverOrigin } from './auth';
 import { call } from './client';
 import { serveStdio } from './mcp';
+import { formatCalendars } from './calendar-output';
 
-const program = new Command().name('mmddyy').version(version).description('Your calendars, events and sharing from the terminal.').option('--server <origin>', 'Server origin', process.env.MMDDYY_SERVER ?? 'https://mcp.mmddyy.app').option('--json', 'Machine-readable JSON output').configureOutput({ writeErr: () => {} }).exitOverride();
+const program = new Command().name('md').version(version).description('Your calendars, events and sharing from the terminal.').option('--server <origin>', 'Server origin', process.env.MMDDYY_SERVER ?? 'https://mcp.mmddyy.app').option('--json', 'Machine-readable JSON output').configureOutput({ writeErr: () => {} }).exitOverride();
 const store = () => new AuthStore(serverOrigin(program.opts().server));
-function output(value: unknown) {
+function output(value: unknown, operation?: OperationName) {
   if (program.opts().json) { process.stdout.write(`${JSON.stringify(value)}\n`); return; }
   if (value && typeof value === 'object' && 'data' in value) {
     const data = value.data;
+    if (operation === 'list_calendars' && Array.isArray(data)) { process.stdout.write(formatCalendars(data)); return; }
     if (Array.isArray(data) && data.length) { console.table(data); return; }
   }
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
@@ -57,7 +59,7 @@ for (const [path, name] of Object.entries(commandTools) as [string, OperationNam
     }
     for (const field of Object.keys(op.schema.shape)) {
       const value = options[camel(flagFor(field))];
-      if (value !== undefined) input[field] = value;
+      if (value !== undefined) input[field] = field === 'published_calendar_ids' ? String(value).split(',').map(id => id.trim()).filter(Boolean) : value;
     }
     if (options.timed) {
       if (options.allDay) throw new CliError('Choose --all-day or --timed.', 'invalid_input', 400);
@@ -65,7 +67,7 @@ for (const [path, name] of Object.entries(commandTools) as [string, OperationNam
     }
     if ('request_id' in op.schema.shape) input.request_id ??= crypto.randomUUID();
     input = op.schema.parse(input);
-    output(await call(store(), name, input));
+    output(await call(store(), name, input), name);
   });
 }
 // Bare commands are requests for help, including command groups such as `auth`.
