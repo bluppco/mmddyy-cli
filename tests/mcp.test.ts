@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { AuthStore } from '../src/auth';
 import { createLocalServer } from '../src/mcp';
+import { operations } from '../../mcp/src/contracts';
 
 test('local MCP lists tools without auth and recovers in the same process after login', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mmddyy-stdio-'));
@@ -26,7 +27,7 @@ test('local MCP lists tools without auth and recovers in the same process after 
   }, { preconnect: () => {} }));
   try {
     await local.connect(serverTransport); await client.connect(clientTransport);
-    expect((await client.listTools()).tools).toHaveLength(19);
+    expect((await client.listTools()).tools.map(tool => tool.name).sort()).toEqual(Object.keys(operations).sort());
     const failed = await client.callTool({ name: 'get_account', arguments: {} });
     expect(failed.isError).toBe(true);
     expect(failed.content).toEqual([expect.objectContaining({ text: expect.stringContaining('Create an account') })]);

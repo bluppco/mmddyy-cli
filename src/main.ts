@@ -7,18 +7,15 @@ import { version } from './version';
 import { AuthStore, CliError, cliFailure, login, serverOrigin } from './auth';
 import { call } from './client';
 import { serveStdio } from './mcp';
-import { formatCalendars } from './calendar-output';
+import { formatOutput } from './output';
+import { terminal, terminalOptions } from './terminal';
+import { listEvents, formatEventList } from './event-list';
 
 const program = new Command().name('md').version(version).description('Your calendars, events and sharing from the terminal.').option('--server <origin>', 'Server origin', process.env.MMDDYY_SERVER ?? 'https://mcp.mmddyy.app').option('--json', 'Machine-readable JSON output').configureOutput({ writeErr: () => {} }).exitOverride();
 const store = () => new AuthStore(serverOrigin(program.opts().server));
 function output(value: unknown, operation?: OperationName) {
   if (program.opts().json) { process.stdout.write(`${JSON.stringify(value)}\n`); return; }
-  if (value && typeof value === 'object' && 'data' in value) {
-    const data = value.data;
-    if (operation === 'list_calendars' && Array.isArray(data)) { process.stdout.write(formatCalendars(data)); return; }
-    if (Array.isArray(data) && data.length) { console.table(data); return; }
-  }
-  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+  process.stdout.write(formatOutput(value, operation));
 }
 const auth = program.command('auth').description('Manage your browser-authorized connection.');
 auth.command('login').option('--no-browser', 'Print the sign-in URL without opening it').action(async options => { await login(store(), options.browser === false); output({ data: { connected: true } }); });
@@ -37,9 +34,14 @@ for (const [path, name] of Object.entries(commandTools) as [string, OperationNam
   }
   const op = operations[name];
   const command = parent.command(parts.at(-1)!).description(op.description).option('--input <file>', 'Read a JSON object from a file, or - for stdin');
+  if (name === 'list_events') command.description('List all saved events grouped by calendar. Optionally filter by calendar or date range.');
   for (const [field, schema] of Object.entries(op.schema.shape)) {
     const flag = flagFor(field);
-    command.option(field === 'all_day' ? '--all-day' : `--${flag} <value>`, schema.description ?? field.replaceAll('_', ' '));
+    const description = name === 'list_events' && field === 'calendar_id' ? 'Calendar name or ID. Defaults to all accessible calendars.'
+      : name === 'list_events' && field === 'from' ? 'Range start: ISO datetime with offset. Supply with --to; otherwise list all saved events.'
+      : name === 'list_events' && field === 'to' ? 'Exclusive range end: ISO datetime with offset. Supply with --from.'
+      : schema.description ?? field.replaceAll('_', ' ');
+    command.option(field === 'all_day' ? '--all-day' : `--${flag} <value>`, description);
   }
   if ('all_day' in op.schema.shape) command.option('--timed', 'Set all_day to false');
   command.action(async options => {
@@ -65,6 +67,12 @@ for (const [path, name] of Object.entries(commandTools) as [string, OperationNam
       if (options.allDay) throw new CliError('Choose --all-day or --timed.', 'invalid_input', 400);
       input.all_day = false;
     }
+    if (name === 'list_events') {
+      const result = await listEvents(input, (operation, args) => call(store(), operation, args));
+      if (program.opts().json) output(result.json);
+      else process.stdout.write(formatEventList(result));
+      return;
+    }
     if ('request_id' in op.schema.shape) input.request_id ??= crypto.randomUUID();
     input = op.schema.parse(input);
     output(await call(store(), name, input), name);
@@ -80,7 +88,7 @@ catch (error) {
   else {
     const failure = error instanceof CliError ? error : error instanceof z.ZodError ? new CliError(error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), 'invalid_input', 400) : error instanceof CommanderError ? new CliError(error.message, 'invalid_input', 400) : new CliError(error instanceof Error ? error.message : 'Request failed.');
     const result = cliFailure(failure, program.opts().server);
-    process.stderr.write(program.opts().json ? `${JSON.stringify({ error: { code: result.code, message: result.message, status: result.status, ...(result.recovery ? { recovery: result.recovery } : {}) } })}\n` : `${result.message}\n`);
+    process.stderr.write(program.opts().json ? `${JSON.stringify({ error: { code: result.code, message: result.message, status: result.status, ...(result.recovery ? { recovery: result.recovery } : {}) } })}\n` : `${terminal(terminalOptions(process.stderr)).error(result.message)}\n`);
     process.exitCode = failure.status === 401 || failure.code === 'invalid_grant' ? 3 : failure.status === 400 ? 2 : 1;
   }
 }

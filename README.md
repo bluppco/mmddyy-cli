@@ -7,12 +7,11 @@ Requires Node.js 22.12 or newer.
 npm install -g @mmddyy/cli
 md auth login
 md calendars list
-md events list --calendar CALENDAR_ID \
-  --from 2026-09-18T00:00:00Z --to 2026-09-25T00:00:00Z
+md events list
 ```
 
-`auth login` opens mmddyy in your browser. Sign in and choose read, write, and/or
-sharing access. Each connection has its own session; existing calendar roles still
+`auth login` opens mmddyy in your browser. Sign in and choose read, write, sharing,
+and/or profile access. Profile access allows publishing selected calendars. Each connection has its own session; existing calendar roles still
 apply. `--no-browser` prints the URL instead. The browser callback must reach the
 CLI's loopback listener on the same machine.
 
@@ -44,12 +43,53 @@ visibility, and time zone; default calendars are marked `(default)`:
 ```text
 My calendar (default)
   ID: 6c21043b-e986-472b-ac91-6a8ec8d504af
-  Group: Personal · Role: Owner · Visibility: Private
+  Group: Personal
+  Role: owner
+  Visibility: private
   Time zone: Asia/Calcutta
 ```
 
-Entries are separated by a blank line. An empty list prints `No calendars found.`
+Entries are separated by a dim rule, capped at 48 columns and shortened to fit the
+terminal. A single entry needs no separator. An empty list prints `No calendars found.`
 Use `md --json calendars list` for the complete data, including internal fields.
+
+Workspace, member, and invitation lists use the same stacked layout. For example,
+`md workspaces list` prints:
+
+```text
+Personal
+  ID: 35bc7702-3739-4e3d-a97a-2f87c14875ed
+  Kind: personal
+  Role: owner
+```
+
+Names are bold, labels and separators are dim, and IDs and links are cyan. Colors
+are disabled for pipes, `TERM=dumb`, or when `NO_COLOR` is set. Prose wraps to the
+terminal width (80 columns when unavailable), including Unicode text. IDs and URLs
+are never truncated or split; exceptionally narrow terminals may wrap them visually.
+Account/profile and event details use labelled fields, and successful deletions,
+revocations, and connection changes print short confirmations. Numeric timestamps
+in details and invitations are shown as readable UTC dates. `--json` always returns
+the original complete response without colors or layout changes.
+
+`events list` shows every saved event across all accessible calendars, grouped by
+calendar and sorted by start date within each group. This includes past and future
+events; repeating events appear once with their repeat rule. Dates and times use
+each calendar's time zone, or `--time-zone` if supplied. Empty calendars are shown
+with `No events.` Each event shows its title, time, optional location, notes and
+recurrence, and stored series ID on separate lines. Multiline notes retain their
+line breaks and wrap to the terminal width. Calendar groups have separators between them.
+
+```sh
+md events list
+md events list --calendar "My calendar"
+md events list --from 2026-09-19T00:00:00+05:30 --to 2026-09-26T00:00:00+05:30
+```
+
+`--calendar` accepts a name (case-insensitive) or full ID; omitting it lists every
+calendar automatically. Duplicate names require an ID only when filtering to one
+calendar. Supply both `--from` and `--to` to show occurrences in that range,
+including each recurrence, instead of all saved events. Range ends are exclusive.
 
 Dates and updates:
 
@@ -70,6 +110,13 @@ Dates and updates:
 `--json` writes a single `{ "data": ... }` object to stdout. Errors go to stderr
 as `{ "error": { "code", "message", "status" } }`. Exit codes: 0 success,
 1 operation/network failure, 2 invalid input, 3 sign-in required.
+
+For `events list`, JSON without a calendar filter returns
+`{ "data": { "calendars": [{ "calendar": { ... }, "events": [...] }] } }`.
+A date range adds `from` and `to` to `data` and `occurrences` to each calendar
+entry. With both `--calendar` and a date range, the existing
+`{ "data": { "events": [...], "occurrences": [...] } }` response is preserved.
+Without dates, a calendar filter uses the grouped response with one calendar.
 
 Authentication errors also include `error.recovery` with `signup_url` and
 `login_command`. These use your selected server. Permission denials and service
@@ -137,3 +184,17 @@ npm pack
 
 Use `node dist/main.js` during development. Deploy and verify the matching MCP
 server before publishing a CLI release. Run resource-intensive checks serially.
+
+## Handles and public profiles
+
+Reconnect with `md auth login` to grant the new `profile` permission before changing existing handles or publishing calendars. Organization creation requires `--handle`.
+
+```sh
+md workspaces create --name Studio --handle studio-example --time-zone UTC
+md account profile --handle mohit-example
+md account profile --visibility public --published-calendar-ids calendar-id
+md workspaces profile --workspace workspace-id --visibility public --published-calendar-ids calendar-one,calendar-two
+md account profile --visibility private --published-calendar-ids ''
+```
+
+Visibility and selected calendar IDs must be sent together; JSON `--input` accepts `published_calendar_ids` as an array. Private is the default. Public HTML and Markdown live at `/@handle` and `/@handle.md` and expose only ongoing/upcoming titles and times. Renaming releases the old handle immediately. Shared-in calendars cannot be published.
